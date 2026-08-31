@@ -1,0 +1,49 @@
+schema_version: 1
+name: docling-parser
+default_branch: main
+description: >
+  Universal PDF/PPTX document parser with vision-based design intelligence.
+  Ships as a FastMCP server + CLI. Extracts text, tables, color palettes,
+  layout analysis, and full design systems from any document.
+agent_contract:
+  instructions:
+    - AGENTS.md
+    - llms.txt
+    - MEMORY.md
+  docs_entrypoints:
+    - README.md
+    - skills/docling-parser/SKILL.md
+checks:
+  fast:
+    - uv run ruff check src/ tests/
+    - uv run pytest -q
+  mcp:
+    - uv run docling-parser-mcp
+harnesses:
+  default: opencode
+  mcp_config:
+    type: local
+    command:
+      - uv
+      - run
+      - --directory
+      - /Users/chriskramer/Code/tws/docling-parser
+      - docling-parser-mcp
+    enabled: true
+tools:
+  - name: parse_document
+    description: Parse a PDF or PPTX document into Markdown or structured JSON
+  - name: build_design_system
+    description: Extract a design system (tokens + components + guidelines) from a document
+  - name: list_parsed
+    description: List all previously parsed documents (metadata only)
+  - name: get_page
+    description: Get a single page's vision analysis from a previously parsed document
+  - name: get_summary
+    description: Get the document-level summary for a previously parsed document
+dependencies:
+  system:
+    - libreoffice (PPTX vision mode only)
+  env:
+    - AGENTWORKS_API_KEY (vision mode)
+    - DOCLING_PARSER_OUTPUT_DIR (optional, default: docling-output/)

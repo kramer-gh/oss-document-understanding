@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+
+# uv
+.uv/
+
+# Tooling
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# OS
+.DS_Store
+
+# Docling model cache (large)
+.cache/
+
+# Parser output (may contain client-sensitive content)
+docling-output/
+
+# Local sample/test artifacts (may contain client-sensitive content)
+sample_documents/
+test_output/

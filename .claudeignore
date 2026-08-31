@@ -1,0 +1,20 @@
+# Lock files - large, auto-generated
+uv.lock
+
+# Virtual environment
+.venv/
+
+# Test output (large vision JSON files, per-page chunks)
+test_output/
+
+# Sample documents (large binary files)
+sample_documents/
+
+# Python cache
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+
+# OS files
+.DS_Store

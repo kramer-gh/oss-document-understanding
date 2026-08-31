@@ -1,0 +1,69 @@
+# docling-parser
+
+> Universal PDF/PPTX document parser with vision-based design intelligence.
+> Ships as a FastMCP server + CLI. Extracts text, tables, color palettes,
+> layout analysis, and full design systems from any document.
+
+## Start Here
+
+- Agent instructions: AGENTS.md
+- API reference: README.md
+- Skill (for harness agents): skills/docling-parser/SKILL.md
+- Cross-session memory: MEMORY.md
+
+## Architecture
+
+- Core parser (Docling-backed): src/docling_parser/converter.py
+- Vision pipeline (render + VLM): src/docling_parser/vision.py
+- Color extraction (PIL quantization): src/docling_parser/color.py
+- Design system synthesis (VLM): src/docling_parser/design_system.py
+- File persistence + browsing: src/docling_parser/storage.py
+- MCP server (5 tools): src/docling_parser/server.py
+- CLI (convert, design-system, list, page, summary): src/docling_parser/cli.py
+- Normalized JSON schema: src/docling_parser/normalizer.py
+
+## MCP Tools
+
+| Tool | Purpose |
+|------|---------|
+| `parse_document(source, output_format, vision, save)` | Parse to markdown/JSON, optionally with vision analysis |
+| `build_design_system(source, save)` | Extract a design system (tokens + components + guidelines) |
+| `list_parsed()` | Browse all previously parsed documents (metadata only) |
+| `get_page(source, page_number)` | Get a single page's vision analysis |
+| `get_summary(source)` | Get document-level summary |
+
+## CLI Commands
+
+| Command | Purpose |
+|---------|---------|
+| `docling-parser convert <source> [--vision] [--save] [-o file]` | Convert a document |
+| `docling-parser design-system <source> [--save] [-o file]` | Extract a design system |
+| `docling-parser list` | List parsed documents |
+| `docling-parser page <source> <n>` | Get a single page's analysis |
+| `docling-parser summary <source>` | Get document summary |
+
+## Source-Of-Truth Files
+
+- Project config: pyproject.toml
+- MCP server entry: src/docling_parser/server.py
+- CLI entry: src/docling_parser/cli.py
+- Vision config (env vars): src/docling_parser/vision.py (VisionConfig.from_env)
+- Output dir config: DOCLING_PARSER_OUTPUT_DIR env var (default: docling-output/)
+- Skill: skills/docling-parser/SKILL.md
+
+## Validation Commands
+
+- Run tests: `uv run pytest`
+- Lint: `uv run ruff check src/ tests/`
+- Full check: `uv run ruff check src/ tests/ && uv run pytest -q`
+- MCP server test: `uv run docling-parser-mcp` (stdio, sends MCP initialize handshake)
+
+## Key Dependencies
+
+- Docling (document conversion): `docling>=2.0.0`
+- FastMCP (MCP server): `fastmcp>=2.3.0`
+- pymupdf (PDF rendering): `pymupdf>=1.24.0`
+- python-pptx (PPTX speaker notes): `python-pptx>=1.0.0`
+- json-repair (VLM JSON fixup): `json-repair>=0.30.0`
+- httpx (VLM API client): `httpx>=0.27`
+- LibreOffice (PPTX slide rendering): system install, `brew install --cask libreoffice`

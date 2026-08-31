@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "docling-parser": {
+      "type": "local",
+      "command": [
+        "uv",
+        "run",
+        "--directory",
+        "/Users/chriskramer/Code/tws/docling-parser",
+        "docling-parser-mcp"
+      ],
+      "enabled": true
+    }
+  }
+}
