@@ -42,7 +42,7 @@ import subprocess
 import tempfile
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
@@ -126,6 +126,7 @@ class VisionConfig:
     routing_header: str = "pin"
     concurrency: int = 4
     timeout: float = 120.0
+    max_tokens: int = 4000
 
     @classmethod
     def from_env(cls) -> VisionConfig:
@@ -138,6 +139,7 @@ class VisionConfig:
             routing_header=os.environ.get("VISION_ROUTING", "pin"),
             concurrency=int(os.environ.get("VISION_CONCURRENCY", "4")),
             timeout=float(os.environ.get("VISION_TIMEOUT", "120")),
+            max_tokens=int(os.environ.get("VISION_MAX_TOKENS", "4000")),
         )
 
     def validate(self) -> None:
@@ -323,7 +325,14 @@ def _vlm_chat(
             )
             resp.raise_for_status()
             data = resp.json()
-            return data["choices"][0]["message"]["content"]
+            message = data["choices"][0]["message"]
+            content = message.get("content")
+            if not content:
+                # Reasoning models (e.g. Nemotron omni) spend the token budget
+                # on chain-of-thought and may return content=None, leaving the
+                # final answer in reasoning_content instead.
+                content = message.get("reasoning_content") or ""
+            return content
         except httpx.HTTPError as exc:
             last_exc = exc
             if attempt < retries - 1:
@@ -352,6 +361,7 @@ def describe_page(png_bytes: bytes, config: VisionConfig) -> dict[str, Any]:
                 ],
             }
         ],
+        max_tokens=config.max_tokens,
     )
     return _extract_json(content)
 
@@ -367,13 +377,23 @@ def summarize_document(
     # small (text-only, no images).
     condensed = []
     for p in page_analyses:
+        layout = p.get("layout", {})
+        graphics = p.get("graphics", [])
         condensed.append(
             {
                 "page": p.get("page"),
                 "summary": p.get("summary", ""),
                 "design_intent": p.get("design_intent", ""),
-                "layout": p.get("layout", {}).get("structure", ""),
-                "graphics": [g.get("type", "") for g in p.get("graphics", [])],
+                "layout": (
+                    layout.get("structure", "")
+                    if isinstance(layout, dict)
+                    else str(layout)
+                ),
+                "graphics": (
+                    [g.get("type", "") for g in graphics]
+                    if isinstance(graphics, list)
+                    else []
+                ),
             }
         )
 
@@ -389,7 +409,7 @@ def summarize_document(
                 "content": DOC_SUMMARY_PROMPT + "\n\n" + user_text,
             }
         ],
-        max_tokens=800,
+        max_tokens=2048,
     )
     return _extract_json(content)
 
@@ -424,20 +444,46 @@ def analyze(
         png = pages_png[idx]
         # Color extraction (fast, local).
         palette = extract_palette(png)
-        # VLM analysis (slow, remote).
-        try:
-            desc = describe_page(png, config)
-        except VisionError as exc:
+        # VLM analysis (slow, remote). Reasoning models can exhaust the token
+        # budget on chain-of-thought without emitting the JSON answer, so
+        # retry once with a doubled budget before giving up on the page.
+        attempt_cfg: VisionConfig = config
+        desc: dict[str, Any] | None = None
+        for _ in range(2):
+            try:
+                candidate = describe_page(png, attempt_cfg)
+                if isinstance(candidate, dict):
+                    desc = candidate
+                    break
+            except VisionError:
+                pass
+            attempt_cfg = replace(config, max_tokens=config.max_tokens * 2)
+        if desc is None:
             desc = {
-                "summary": f"[vision analysis failed: {exc}]",
+                "summary": "[vision analysis failed after retries]",
                 "design_intent": "",
-                "layout": {"structure": "unknown", "description": str(exc)},
+                "layout": {"structure": "unknown", "description": ""},
                 "typography": {},
                 "sections": [],
                 "graphics": [],
                 "visual_hierarchy": "",
                 "readable_text": "",
             }
+        layout = desc.get("layout")
+        desc["layout"] = (
+            layout
+            if isinstance(layout, dict)
+            else {"structure": str(layout), "description": ""}
+        )
+        typo = desc.get("typography")
+        if not isinstance(typo, dict):
+            desc["typography"] = {}
+        for key in ("sections", "graphics"):
+            if not isinstance(desc.get(key), list):
+                desc[key] = []
+        for key in ("summary", "design_intent", "visual_hierarchy", "readable_text"):
+            if not isinstance(desc.get(key), str):
+                desc[key] = str(desc.get(key))
         # Merge color palette into the result.
         desc["color_palette"] = {
             "dominant": palette["dominant"],

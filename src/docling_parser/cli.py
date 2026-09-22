@@ -77,7 +77,7 @@ def _vision_to_markdown(vision: dict[str, Any]) -> str:
 
 
 def _convert(args: argparse.Namespace) -> int:
-    parser = DocumentParser()
+    parser = DocumentParser(do_ocr=False if args.no_ocr else None)
     try:
         result = parser.parse(
             args.source,
@@ -210,6 +210,12 @@ def main() -> None:
         "--vision",
         action="store_true",
         help="render pages and describe layout/graphics with a BYOK vision model",
+    )
+    conv.add_argument(
+        "--no-ocr",
+        action="store_true",
+        help="skip OCR for PDFs with a text layer (much faster; charts stay "
+        "as images for vision analysis)",
     )
     conv.add_argument(
         "--save",

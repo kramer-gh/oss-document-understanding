@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import html
 import ipaddress
+import os
 import socket
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -103,10 +104,43 @@ def _assert_public_url(url: str) -> None:
 class DocumentParser:
     """Convert PDF and PPTX documents into Markdown or structured JSON."""
 
-    def __init__(self) -> None:
+    def __init__(self, *, do_ocr: bool | None = None) -> None:
+        """Create a parser.
+
+        Args:
+            do_ocr: Whether Docling should run OCR for PDF pages. ``None``
+                keeps Docling's default (OCR enabled). Set explicitly to skip
+                OCR for PDFs that already carry a text layer — OCR on
+                image/chart-heavy pages is slow and often returns empty text.
+                The ``DOCLING_OCR`` environment variable (``1``/``0``)
+                overrides the argument when it is not passed.
+        """
+        if do_ocr is None:
+            env = os.environ.get("DOCLING_OCR")
+            if env is not None:
+                do_ocr = env.strip().lower() in {"1", "true", "yes", "on"}
+        self._do_ocr = do_ocr
         # DocumentConverter is stateful (model loading) — construct once and
         # reuse across parses within a process (MCP server or CLI batch).
-        self._converter = DocumentConverter()
+        self._converter = self._build_converter(do_ocr)
+
+    @staticmethod
+    def _build_converter(
+        do_ocr: bool | None,
+    ) -> DocumentConverter:
+        if do_ocr is None:
+            return DocumentConverter()
+        from docling.datamodel.base_models import InputFormat
+        from docling.datamodel.pipeline_options import PdfPipelineOptions
+        from docling.document_converter import PdfFormatOption
+
+        opts = PdfPipelineOptions()
+        opts.do_ocr = do_ocr
+        return DocumentConverter(
+            format_options={
+                InputFormat.PDF: PdfFormatOption(pipeline_options=opts)
+            }
+        )
 
     def parse(
         self,
@@ -156,6 +190,12 @@ class DocumentParser:
         }
 
         notes = self._extract_notes(source, source_format)
+        if self._do_ocr is False:
+            notes.insert(
+                0,
+                "OCR disabled (text-layer extraction only); set DOCLING_OCR=1 "
+                "to force OCR",
+            )
 
         if output_format == "markdown":
             content: str | dict[str, Any] = html.unescape(
