@@ -173,3 +173,26 @@ class TestStem:
     def test_special_chars(self):
         assert storage._stem("Agent_Works™ (former Polis)_ External Deck.pptx") == \
             "agent-works-former-polis-external-deck"
+
+class TestPageImages:
+    def test_pages_dir_matches_saved_pages(self, tmp_output, sample_result):
+        files = storage.save_parse_result("test-deck.pptx", sample_result)
+        assert storage.pages_dir("test-deck.pptx") == Path(files["pages_dir"])
+
+    def test_page_index_records_the_image_path(self, tmp_output, sample_result):
+        for page in sample_result["vision"]["pages"]:
+            page["image"] = str(
+                storage.pages_dir("test-deck.pptx") / f"page-{page['page']:03d}.png"
+            )
+        files = storage.save_parse_result("test-deck.pptx", sample_result)
+        index = json.loads(Path(files["index"]).read_text())
+        images = [p["image"] for p in index["page_index"]]
+        assert images[0].endswith("page-001.png")
+        assert all(images)
+
+    def test_page_index_image_is_null_without_vision_images(
+        self, tmp_output, sample_result
+    ):
+        files = storage.save_parse_result("test-deck.pptx", sample_result)
+        index = json.loads(Path(files["index"]).read_text())
+        assert all(p["image"] is None for p in index["page_index"])

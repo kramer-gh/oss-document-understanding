@@ -60,11 +60,17 @@ def parse_document(
         On failure: a dict with an "error" key.
     """
     try:
+        images_dir = None
+        if save and vision:
+            from docling_parser import storage
+
+            images_dir = str(storage.pages_dir(source))
         result = _parser.parse(
             source,
             output_format=output_format,
             max_chars=max_chars or None,
             vision=vision,
+            images_dir=images_dir,
         )
     except ConversionError as exc:
         return {"error": str(exc), "source": source}

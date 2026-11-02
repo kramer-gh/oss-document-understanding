@@ -419,12 +419,38 @@ def summarize_document(
 # ---------------------------------------------------------------------------
 
 
+def write_page_images(
+    pages_png: list[bytes], images_dir: str | Path
+) -> list[str]:
+    """Write rendered pages to ``images_dir`` and return their paths.
+
+    The vision analysis describes a page; these files let a reader look at it.
+    Naming is ``page-001.png`` so it sorts beside ``page-001.json``.
+    """
+    out = Path(images_dir)
+    out.mkdir(parents=True, exist_ok=True)
+    paths: list[str] = []
+    for idx, png in enumerate(pages_png):
+        path = out / f"page-{idx + 1:03d}.png"
+        path.write_bytes(png)
+        paths.append(str(path))
+    return paths
+
+
 def analyze(
     source: str,
     source_format: str,
     config: VisionConfig | None = None,
+    images_dir: str | Path | None = None,
 ) -> dict[str, Any]:
     """Render, extract colors, and visually analyze every page/slide.
+
+    Args:
+        images_dir: When given, write each rendered page to this directory as
+            ``page-001.png`` and record its path on the page analysis as
+            ``image``. The pixels are otherwise discarded after the vision
+            call, which leaves a reader with a description of the page and no
+            way to look at it.
 
     Returns a dict with:
     - ``document_summary``: document-level design intelligence
@@ -436,6 +462,10 @@ def analyze(
     config.validate()
 
     pages_png = render_pages(source, source_format)
+
+    image_paths: list[str | None] = [None] * len(pages_png)
+    if images_dir is not None:
+        image_paths = write_page_images(pages_png, images_dir)
 
     # Phase 1: per-page color extraction + VLM analysis (parallel).
     results: list[dict[str, Any]] = [{}] * len(pages_png)
@@ -491,7 +521,7 @@ def analyze(
             "is_dark_theme": palette["is_dark_theme"],
             "description": desc.pop("color_description", ""),
         }
-        return idx, {"page": idx + 1, **desc}
+        return idx, {"page": idx + 1, **desc, "image": image_paths[idx]}
 
     with ThreadPoolExecutor(max_workers=config.concurrency) as pool:
         futures = [pool.submit(_work, i) for i in range(len(pages_png))]

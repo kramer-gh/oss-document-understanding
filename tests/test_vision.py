@@ -7,6 +7,8 @@ and page rendering require external services and are not unit-tested here.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from docling_parser.vision import (
@@ -14,6 +16,7 @@ from docling_parser.vision import (
     VisionError,
     _extract_json,
     _find_soffice,
+    write_page_images,
 )
 
 
@@ -100,3 +103,18 @@ class TestFindSoffice:
         # may or may not find LibreOffice, but it should not raise.
         result = _find_soffice()
         assert result is None or isinstance(result, str)
+
+
+class TestWritePageImages:
+    def test_writes_one_png_per_page(self, tmp_path):
+        pages = [b"\x89PNG\r\n\x1a\none", b"\x89PNG\r\n\x1a\ntwo"]
+        paths = write_page_images(pages, tmp_path / "deck.pages")
+        assert len(paths) == 2
+        assert Path(paths[0]).name == "page-001.png"
+        assert Path(paths[1]).name == "page-002.png"
+        assert Path(paths[0]).read_bytes() == pages[0]
+
+    def test_creates_the_directory(self, tmp_path):
+        target = tmp_path / "nested" / "deck.pages"
+        write_page_images([b"x"], target)
+        assert target.is_dir()
