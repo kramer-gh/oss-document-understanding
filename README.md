@@ -1,6 +1,6 @@
-# docling-parser
+# Intelligent Knowledge Document Parser
 
-Universal **PDF and PPTX document parser** built on IBM's
+Universal **PDF and PPTX document parser** based on IBM's
 [Docling](https://docling-project.github.io/docling/). Ships as a **FastMCP
 server** (the universal, harness-agnostic artifact), a **CLI**, and an
 **OpenDesign skill** for first-class discoverability.
@@ -16,6 +16,8 @@ dies in another; an MCP server runs identically everywhere. Docling already
 ships an official `docling-mcp`, so this project is a **thin, stable wrapper**
 that adds:
 
+- visual document understanding and description (page layout, chart interpretation, thematic interpretation)
+- vision
 - a minimal, stable tool surface (`parse_document`) that won't churn upstream,
 - **PPTX speaker-note extraction** (Docling doesn't reliably surface notes),
 - a **normalized JSON schema** independent of Docling's internal object model,
@@ -276,13 +278,22 @@ docling-output/
   {stem}.md                  markdown output (text-only parse)
   {stem}.pages/
     page-001.json            per-page vision analysis (~2-6 KB)
+    page-001.png             the rendered page, so a reader can look at it
     page-002.json
+    page-002.png
     ...
   {stem}.design-system.json  design system
 ```
 
 The **index** file is the entry point: it's small, lists every page with a
-one-line summary and structure type, and points to all other files.
+one-line summary and structure type, and points to all other files. Each
+`page_index` entry carries both `file` (the analysis) and `image` (the rendered
+PNG), so an agent can read the description and then look at the page.
+
+The images are written only when `vision=True` and `save=True`. Vision already
+renders every page to send it to the model; without this the pixels are
+discarded after the call and the reader is left with a description of a page
+they cannot see. They are PNG at 150 dpi, the same raster the model saw.
 
 ### Browsing tools (MCP + CLI)
 

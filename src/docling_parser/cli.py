@@ -78,12 +78,18 @@ def _vision_to_markdown(vision: dict[str, Any]) -> str:
 
 def _convert(args: argparse.Namespace) -> int:
     parser = DocumentParser(do_ocr=False if args.no_ocr else None)
+    images_dir = None
+    if args.save and args.vision:
+        from docling_parser import storage
+
+        images_dir = str(storage.pages_dir(args.source))
     try:
         result = parser.parse(
             args.source,
             output_format=args.format,
             max_chars=args.max_chars or None,
             vision=args.vision,
+            images_dir=images_dir,
         )
     except ConversionError as exc:
         print(f"error: {exc}", file=sys.stderr)

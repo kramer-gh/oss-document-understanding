@@ -149,6 +149,7 @@ class DocumentParser:
         *,
         max_chars: int | None = 100_000,
         vision: bool = False,
+        images_dir: str | None = None,
     ) -> ParseResult:
         """Parse a document from a local path or http(s) URL.
 
@@ -161,6 +162,9 @@ class DocumentParser:
                 sections, and graphics with a BYOK vision model (see
                 :mod:`docling_parser.vision`). Results are attached to the
                 returned result's ``vision`` field.
+            images_dir: When given and ``vision`` is True, keep the rendered
+                page images in this directory and record each page's path as
+                ``image`` in the vision result.
 
         Returns:
             A :class:`ParseResult` with normalized content and metadata.
@@ -221,7 +225,7 @@ class DocumentParser:
             from docling_parser.vision import VisionError, analyze
 
             try:
-                vision_result = analyze(source, source_format)
+                vision_result = analyze(source, source_format, images_dir=images_dir)
             except VisionError as exc:
                 raise ConversionError(f"vision analysis failed: {exc}") from exc
 

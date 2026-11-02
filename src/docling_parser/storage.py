@@ -47,6 +47,17 @@ def _output_dir() -> Path:
     return Path(os.environ.get("DOCLING_PARSER_OUTPUT_DIR", DEFAULT_OUTPUT_DIR))
 
 
+def pages_dir(source: str, output_dir: Path | None = None) -> Path:
+    """Directory that holds a document's rendered page images.
+
+    Pass this to ``parse(..., images_dir=...)`` so the rendered pages survive
+    the vision call: the analysis describes the page, and the image lets a
+    reader look at it.
+    """
+    out = output_dir or _output_dir()
+    return out / f"{_stem(source)}.pages"
+
+
 def save_parse_result(
     source: str,
     result_dict: dict[str, Any],
@@ -97,11 +108,11 @@ def save_parse_result(
     page_index: list[dict[str, Any]] = []
     if has_vision:
         pages = vision.get("pages", [])
-        pages_dir = out / f"{stem}.pages"
-        pages_dir.mkdir(exist_ok=True)
+        pdir = pages_dir(source, out)
+        pdir.mkdir(parents=True, exist_ok=True)
         for page in pages:
             page_num = page.get("page", 0)
-            page_file = pages_dir / f"page-{page_num:03d}.json"
+            page_file = pdir / f"page-{page_num:03d}.json"
             page_file.write_text(json.dumps(page, indent=2, default=str))
             # Add to index: one-line summary + structure.
             layout = page.get("layout", {})
@@ -111,8 +122,9 @@ def save_parse_result(
                 "summary": page.get("summary", ""),
                 "structure": structure,
                 "file": str(page_file),
+                "image": page.get("image"),
             })
-        files["pages_dir"] = str(pages_dir)
+        files["pages_dir"] = str(pdir)
 
     # 5. Index file (the browsing entry point).
     index = {
